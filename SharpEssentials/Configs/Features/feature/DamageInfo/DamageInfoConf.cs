@@ -22,7 +22,7 @@ namespace SharpEssentials {
         public PrintModeConf RoundEndSummary { get; set; } = new PrintModeConf();
 
         public bool FriendlyFireMode { get; set; } = false;
-        public bool IncludeBots { get; set; } = false;
+        public bool IncludeBots { get; set; } = true;
 
     }
 }

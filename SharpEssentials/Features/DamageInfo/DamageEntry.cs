@@ -5,8 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace SharpEssentials {
-    public class DamageEntry(ulong victimID, int healthDmg, int armorDmg) {
-        public ulong victimID { get; set; } = victimID;
+    public class DamageEntry(int victimSlot, string? victimName, int healthDmg, int armorDmg) {
+        public int victimSlot { get; set; } = victimSlot;
+        public string? victimName { get; set; } = victimName;
         public int hp { get; set; } = healthDmg;
         public int armor { get; set; } = armorDmg;
     }

@@ -11,7 +11,8 @@ using System.Threading.Tasks;
 namespace SharpEssentials {
     internal class DamageInfo(SharpEssentials plugin) : PluginFeatureWithCommand(plugin) {
      
-        private Dictionary<ulong,List<DamageEntry>> damages = new Dictionary<ulong, List<DamageEntry>>();
+        private Dictionary<int,List<DamageEntry>> damages = new Dictionary<int, List<DamageEntry>>();
+
 
         public override CommandConfig GetConfig() {
             return config.DamageInfo.Command;
@@ -22,8 +23,6 @@ namespace SharpEssentials {
         }
 
         public override void OnCommand(CCSPlayerController player, CommandInfo command) {
-            player.PrintToCenterAlert("<h1 style='color:blue'>Neekeri</h1>");
-            
             //GetSummary(player);
         }
 
@@ -47,55 +46,85 @@ namespace SharpEssentials {
 
                 int DmgHealth = @event.DmgHealth;
                 int DmgArmor = @event.DmgArmor;
+                int HitBox = @event.Hitgroup;
 
-                PrintInfos(attacker, victim, cfg.PrintWhenDamaged, DmgHealth, DmgArmor);
+                if(!attacker.IsBot) {
+                    PrintInfos(attacker, victim, cfg.PrintWhenDamaged, DmgHealth, DmgArmor, HitBox);
+                }
 
-                addDamageEntry(attacker, new DamageEntry(victim.SteamID, DmgHealth, DmgArmor));
-
+                addDamageEntry(attacker, new DamageEntry(victim.Slot, victim.PlayerName, DmgHealth, DmgArmor));
+                
                 return HookResult.Continue;
             });
             plugin.RegisterEventHandler<EventRoundEnd>((@event, info) => {
-                var cfg = config.DamageInfo;
-                foreach(var p in Utilities.GetPlayers()) {
-                    GetSummary(p).ForEach(sum => {
-                        p.PrintToChat($"[{sum.name} - {sum.done.hp} - {sum.done.armor} - {sum.done.hits} | {sum.taken.hp} - {sum.taken.armor} - {sum.taken.hits}]");
-                    });
-                }
+                PrintAllSummaries();
+                damages.Clear();
                 return HookResult.Continue;
             });
         }
 
-        public override void OnDisconnect(CCSPlayerController player) {
-            damages.Remove(player.SteamID);
+        private void PrintAllSummaries() {
+            var cfg = config.DamageInfo;
+            foreach(var p in Utilities.GetPlayers()) {
+                if (p.IsBot) continue;
+                var summaries = GetSummary(p);
+                if(summaries.Count() > 0) {
+                    lang.DamageInfo.Summary.Header.ForEach(p.Send);
+                    for(int i = 0; i < summaries.Count; i++) {
+                        var sum = summaries[i];
+                        formatSummaryLine(i + 1, sum).ForEach(p.Send);
+                    }
+                    lang.DamageInfo.Summary.Footer.ForEach(p.Send);
+                }
+            }
+        }
+        private List<string> formatSummaryLine(int num, DamageSummary sum) {
+            var formatLines = lang.DamageInfo.Summary.Entry;
+            List<string> summary = new List<string>();
+
+            foreach(var format in formatLines) {
+                string name = sum.name != null ? sum.name : GetPlayerName(sum.done.victimSlot);
+                string line = format;
+                line = line.ReplaceIgnoreCase("{NUM}", num);
+                line = line.ReplaceIgnoreCase("{NAME}", name);
+                line = line.ReplaceIgnoreCase("{HP}", sum.taken.hp);
+                line = line.ReplaceIgnoreCase("{ARMOR}", sum.taken.armor);
+                line = line.ReplaceIgnoreCase("{HITS}", sum.taken.hits);
+                line = line.ReplaceIgnoreCase("{ENEMY_HP}", sum.done.hp);
+                line = line.ReplaceIgnoreCase("{ENEMY_ARMOR}", sum.done.armor);
+                line = line.ReplaceIgnoreCase("{ENEMY_HITS}", sum.done.hits);
+                summary.Add(line);
+            }
+            return summary;
         }
 
         private void addDamageEntry(CCSPlayerController player, DamageEntry entry) {
-            if(!damages.ContainsKey(player.SteamID)) damages.Add(player.SteamID, new List<DamageEntry>());
-            var entries = damages[player.SteamID];
+            if(!damages.ContainsKey(player.Slot)) damages.Add(player.Slot, new List<DamageEntry>());
+            var entries = damages[player.Slot];
             entries.Add(entry);
-            damages[player.SteamID] = entries;
+            damages[player.Slot] = entries;
         }
 
         private List<DamageSummary> GetSummary(CCSPlayerController player) {
             List<DamageSummary> summary = new List<DamageSummary>();
 
-            Dictionary<ulong, DamageEntryHits> damageDone = new Dictionary<ulong, DamageEntryHits>();
-            Dictionary<ulong, DamageEntryHits> damageTaken = new Dictionary<ulong, DamageEntryHits>();
+            Dictionary<int, DamageEntryHits> damageDone = new Dictionary<int, DamageEntryHits>();
+            Dictionary<int, DamageEntryHits> damageTaken = new Dictionary<int, DamageEntryHits>();
 
             foreach(var entry in damages) {
                 foreach(DamageEntry damage in entry.Value) {
-                    if(entry.Key == player.SteamID) {
-                        if(!damageDone.ContainsKey(damage.victimID)) {
-                            damageDone[damage.victimID] = new DamageEntryHits(damage.victimID, 0, 0, 0);
+                    if(entry.Key == player.Slot) {
+                        if(!damageDone.ContainsKey(damage.victimSlot)) {
+                            damageDone[damage.victimSlot] = new DamageEntryHits(damage.victimSlot, damage.victimName, 0, 0, 0);
                         }
 
-                        DamageEntryHits currentDamage = damageDone[damage.victimID];
+                        DamageEntryHits currentDamage = damageDone[damage.victimSlot];
                         currentDamage.hp += damage.hp;
                         currentDamage.armor += damage.armor;
                         currentDamage.hits += 1;
-                    } else if(damage.victimID == player.SteamID) {
+                    } else if(damage.victimSlot == player.Slot) {
                         if(!damageTaken.ContainsKey(entry.Key)) {
-                            damageTaken[entry.Key] = new DamageEntryHits(entry.Key, 0, 0, 0);
+                            damageTaken[entry.Key] = new DamageEntryHits(entry.Key, damage.victimName, 0, 0, 0);
                         }
 
                         DamageEntryHits currentDamage = damageTaken[entry.Key];
@@ -106,26 +135,52 @@ namespace SharpEssentials {
                 }
             }
 
-            foreach(ulong victimID in damageDone.Keys.Union(damageTaken.Keys)) {
-                CCSPlayerController? victim = Utilities.GetPlayerFromSteamId(victimID);
-                string name = (victim != null ? victim.PlayerName : "Unknown");
-                DamageEntryHits done = damageDone.ContainsKey(victimID) ? damageDone[victimID] : new DamageEntryHits(victimID, 0, 0, 0);
-                DamageEntryHits taken = damageTaken.ContainsKey(victimID) ? damageTaken[victimID] : new DamageEntryHits(victimID, 0, 0, 0);
-                summary.Add(new DamageSummary(name, done, taken));
+            foreach(int slot in damageDone.Keys.Union(damageTaken.Keys)) {
+                DamageEntryHits done = damageDone.ContainsKey(slot) ? damageDone[slot] : new DamageEntryHits(slot, GetPlayerName(slot), 0, 0, 0);
+                DamageEntryHits taken = damageTaken.ContainsKey(slot) ? damageTaken[slot] : new DamageEntryHits(slot, GetPlayerName(slot), 0, 0, 0);
+                summary.Add(new DamageSummary(done.victimName, done, taken));
             }
             return summary;
         }
+        private string GetPlayerName(int slot) {
+            CCSPlayerController? victim = Utilities.GetPlayerFromSlot(slot);
+            return (victim != null ? victim.PlayerName : "Unknown");
+        }
 
-        private void PrintInfos(CCSPlayerController attacker, CCSPlayerController victim, PrintModeConf mode, int hp, int armor) {
+        private string GetHitBoxLang(int hitbox) {
+            var boxes = lang.DamageInfo.HitBoxes;
+            return hitbox switch {
+                0 => boxes.Body,
+                1 => boxes.Head,
+                2 => boxes.Chest,
+                3 => boxes.Stomach,
+                4 => boxes.LeftArm,
+                5 => boxes.RightArm,
+                6 => boxes.LeftLeg,
+                7 => boxes.RightLeg,
+                10 => boxes.Gear,
+                _ => boxes.Unknown
+            };;
+        }
+
+        private void PrintInfos(CCSPlayerController attacker, CCSPlayerController victim, PrintModeConf mode, int hp, int armor, int box) {
             string name = victim.PlayerName;
-            if(mode.Console) {
-                attacker.PrintToCenterHtml("<h1 style='color:blue'>Damaged: "+name+" | -"+hp+" hp -"+armor+" armor</h1>", 1000);
-            }
+
             if(mode.Chat) {
-                attacker.PrintToChat("Damaged: " + name + " | -" + hp + " hp -" + armor + " armor");
+                var format = lang.DamageInfo.ChatFormat;
+                format = format.ReplaceIgnoreCase("{NAME}", name);
+                format = format.ReplaceIgnoreCase("{HEALTH}", hp);
+                format = format.ReplaceIgnoreCase("{ARMOR}", armor);
+                format = format.ReplaceIgnoreCase("{HITBOX}", GetHitBoxLang(box));
+                attacker.Send(format);
             }
             if(mode.Console) {
-                attacker.PrintToConsole("Damaged: " + name + " | -" + hp + " hp -" + armor + " armor");
+                var format = lang.DamageInfo.ConsoleFormat;
+                format = format.ReplaceIgnoreCase("{NAME}", name);
+                format = format.ReplaceIgnoreCase("{HEALTH}", hp);
+                format = format.ReplaceIgnoreCase("{ARMOR}", armor);
+                format = format.ReplaceIgnoreCase("{HITBOX}", GetHitBoxLang(box));
+                attacker.PrintToConsole(format);
             }
         }
 

@@ -33,9 +33,9 @@ namespace SharpEssentials {
         public string NotEnoughtMoney { get; set; } = "{PREFIX} You don't have enought money!";
         public string YouPurchasedItem { get; set; } = "{PREFIX} You have pruchased {LIME}{ITEM}{GREY} for ${LIME}{PRICE}";
         public string YouPurchasedItemFree { get; set; } = "{PREFIX} You got {LIME}{ITEM}{GREY}";
-        public string DamageInfoChatFormat { get; set; } = "{PREFIX} You got {LIME}{ITEM}{GREY}";
 
 
+        public DamageInfoLang DamageInfo { get; set; } = new DamageInfoLang();
 
         public ToggleStatesLang ToggleStates {  get; set; } = new ToggleStatesLang();
         public ColorsLang Colors { get; set; } = new ColorsLang();

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 namespace SharpEssentials {
     public class CustomMessagesConf(bool enabled) : ToggleableFeature(enabled) {
 
+        public bool IncludeBots { get; set; } = true;
         public bool useJoin { get; set; } = true;
         public bool useQuit { get; set; } = true;
         public bool useTeamJoinT { get; set; } = true;

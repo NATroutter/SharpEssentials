@@ -9,7 +9,6 @@ namespace SharpEssentials {
 
         public bool Console { get; set; } = true;
         public bool Chat { get; set; } = true;
-        public bool Center { get; set; } = true;
 
     }
 }
